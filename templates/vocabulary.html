@@ -1,20 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocabulary</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Your Vocabulary</h1>
-        <ul>
-            {% for word, translation in vocab %}
-                <li>{{ word }} → {{ translation }}</li>
-            {% endfor %}
-        </ul>
-        <a href="/">Back to Home</a>
-    </div>
-</body>
-</html>
+{% extends 'base.html' %}
+{% block title %}Vocabulary{% endblock %}
+{% block content %}
+<h1>Your Vocabulary</h1>
+<ul>
+    {% for word, translation in vocab %}
+        <li><strong>{{ word }}</strong> - {{ translation }}</li>
+    {% else %}
+        <li>No vocabulary saved yet!</li>
+    {% endfor %}
+</ul>
+{% endblock %}

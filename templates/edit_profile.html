@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Edit Profile{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow p-4">
+                <h3 class="text-center mb-4">Edit Your Profile</h3>
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Username:</label>
+                        <input type="text" name="username" class="form-control" value="{{ username }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">About Me:</label>
+                        <textarea name="about_me" class="form-control" rows="3" placeholder="Tell us about yourself...">{{ about_me }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">New Avatar:</label>
+                        <input type="file" name="avatar" class="form-control">
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

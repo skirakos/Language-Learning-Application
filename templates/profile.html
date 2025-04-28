@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow p-4 text-center">
+
+                <!-- Clickable Avatar Upload for logged-in user only -->
+                {% if session['user_id'] == user_id %}
+                <label for="avatar-upload" style="cursor:pointer;">
+                    <img src="/{{ avatar if avatar else 'static/avatars/default.png' }}" 
+                         alt="Avatar" 
+                         class="rounded-circle mb-3" 
+                         style="width:150px; height:150px; object-fit:cover;">
+                </label>
+                <input type="file" id="avatar-upload" style="display:none;" onchange="uploadAvatar()">
+                {% else %}
+                <img src="/{{ avatar if avatar else 'static/avatars/default.png' }}" 
+                     alt="Avatar" 
+                     class="rounded-circle mb-3" 
+                     style="width:150px; height:150px; object-fit:cover;">
+                {% endif %}
+
+                <h3 id="username-display">
+                    {{ username }}
+                    {% if session['user_id'] == user_id %}
+                    <i class="bi bi-pencil-square text-primary" style="cursor:pointer;" onclick="editField('username')"></i>
+                    {% endif %}
+                </h3>
+
+                {% if session['user_id'] == user_id %}
+                <div id="username-edit" style="display:none;">
+                    <input type="text" id="username-input" class="form-control" value="{{ username }}">
+                    <button class="btn btn-success btn-sm mt-2" onclick="saveField('username')">Save</button>
+                </div>
+                {% endif %}
+
+                <p class="text-muted mt-4" id="about_me-display">
+                    About Me: {{ about_me if about_me else "No description yet." }}
+                    {% if session['user_id'] == user_id %}
+                    <i class="bi bi-pencil-square text-primary" style="cursor:pointer;" onclick="editField('about_me')"></i>
+                    {% endif %}
+                </p>
+
+                {% if session['user_id'] == user_id %}
+                <div id="about_me-edit" style="display:none;">
+                    <textarea id="about_me-input" class="form-control">{{ about_me if about_me else "" }}</textarea>
+                    <button class="btn btn-success btn-sm mt-2" onclick="saveField('about_me')">Save</button>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function editField(field) {
+    document.getElementById(field + '-display').style.display = 'none';
+    document.getElementById(field + '-edit').style.display = 'block';
+}
+
+async function saveField(field) {
+    const value = document.getElementById(field + '-input').value.trim();
+    if (!value) {
+        alert('Value cannot be empty!');
+        return;
+    }
+
+    const response = await fetch('/save_profile_field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field, value })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        location.reload();
+    } else {
+        alert('Error saving. Please try again.');
+    }
+}
+
+async function uploadAvatar() {
+    const fileInput = document.getElementById('avatar-upload');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await fetch('/upload_avatar', {
+        method: 'POST',
+        body: formData
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        location.reload();
+    } else {
+        alert('Error uploading avatar.');
+    }
+}
+</script>
+{% endblock %}

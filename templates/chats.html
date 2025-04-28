@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Chats{% endblock %}
+{% block content %}
+<h1>Your Chats</h1>
+<ul>
+    {% for friend in friends %}
+        <li>
+            <a href="{{ url_for('chat', friend_id=friend[0]) }}">{{ friend[1] }}</a>
+        </li>
+    {% else %}
+        <li>No friends to chat with yet!</li>
+    {% endfor %}
+</ul>
+{% endblock %}

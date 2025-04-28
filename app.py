@@ -6,12 +6,56 @@ from gtts import gTTS
 import sqlite3
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import g
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Replace with a strong secret key
+app.secret_key = 'your_secret_key'
+
+socketio = SocketIO(app)
+DATABASE = 'vocabulary.db'
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+    return db
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    sender_id = session.get('user_id')
+    receiver_id = data['receiver_id']
+    message = data['message']
+
+    # Save to database
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO messages (sender_id, receiver_id, message)
+        VALUES (?, ?, ?)
+    ''', (sender_id, receiver_id, message))
+    conn.commit()
+    conn.close()
+
+    # Emit to sender and receiver
+    emit('receive_message', {
+        'sender_id': sender_id,
+        'receiver_id': receiver_id,
+        'message': message
+    }, room=f"user_{receiver_id}")
+
+    emit('receive_message', {
+        'sender_id': sender_id,
+        'receiver_id': receiver_id,
+        'message': message
+    }, room=f"user_{sender_id}")
 
 translator = GoogleTranslator(source='fr', target='en')
 
+@socketio.on('join')
+def on_join(data):
+    room = data['room']
+    join_room(room)
 # Initialize SQLite Database
 def initialize_database():
     conn = sqlite3.connect("vocabulary.db")
@@ -36,7 +80,17 @@ def initialize_database():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
-    
+    # ✅ Create Friendships Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS friendships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            friend_id INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected')),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (friend_id) REFERENCES users(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -65,15 +119,24 @@ def signup():
         password = request.form['password']
         hashed_password = generate_password_hash(password)
 
-        conn = sqlite3.connect("vocabulary.db")
+        conn = sqlite3.connect('vocabulary.db')
         cursor = conn.cursor()
         try:
             cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
             conn.commit()
+
+            cursor.execute('SELECT id, username, avatar FROM users WHERE username = ?', (username,))
+            user = cursor.fetchone()
+
+            session['user_id'] = user[0]
+            session['username'] = user[1]
+            session['avatar'] = user[2] if user[2] else 'static/avatars/default.png'
+
             conn.close()
-            return redirect(url_for('login'))
+            return redirect(url_for('index'))
         except sqlite3.IntegrityError:
-            return "Username already exists, please choose another one."
+            conn.close()
+            return "Username already exists."
 
     return render_template('signup.html')
 
@@ -84,17 +147,23 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        conn = sqlite3.connect("vocabulary.db")
+        conn = sqlite3.connect('vocabulary.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        cursor.execute('SELECT id, username, password, avatar FROM users WHERE username = ?', (username,))
         user = cursor.fetchone()
         conn.close()
 
-        if user and check_password_hash(user[2], password):  # user[2] is the password column
-            session['user_id'] = user[0]  # Store user ID in session
+        if user and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['username'] = user[1]
+            session['avatar'] = user[3] if user[3] else 'static/avatars/default.png'
+            print("hellllooooo")
+            print(session['user_id'], session['username'])
             return redirect(url_for('index'))
         else:
-            return "Invalid credentials, please try again."
+            return "Invalid credentials."
+        
+        
 
     return render_template('login.html')
 
@@ -173,6 +242,237 @@ def view_vocabulary():
     vocab = get_vocabulary(user_id)
     return render_template('vocabulary.html', vocab=vocab)
 
+
+@app.route('/friends', methods=['GET', 'POST'])
+def friends():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    search_query = request.args.get('search')
+
+    # Get accepted friends
+    cursor.execute('''
+        SELECT u.id, u.username FROM users u
+        JOIN friendships f ON (f.friend_id = u.id OR f.user_id = u.id)
+        WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
+    ''', (user_id, user_id, user_id))
+    friends = cursor.fetchall()
+
+    # Get pending friend requests
+    cursor.execute('''
+        SELECT f.id, u.username FROM friendships f
+        JOIN users u ON f.user_id = u.id
+        WHERE f.friend_id = ? AND f.status = 'pending'
+    ''', (user_id,))
+    requests = cursor.fetchall()
+
+    # Search or show all users
+    if search_query:
+        cursor.execute('''
+            SELECT id, username FROM users
+            WHERE id != ? AND username LIKE ?
+        ''', (user_id, f'%{search_query}%'))
+    else:
+        cursor.execute('''
+            SELECT id, username FROM users
+            WHERE id != ?
+        ''', (user_id,))
+    all_users = cursor.fetchall()
+
+    conn.close()
+
+    return render_template('friends.html', 
+                           friends=friends,
+                           requests=requests,
+                           all_users=all_users,
+                           search_query=search_query)
+
+@app.route('/add_friend/<int:friend_id>')
+def add_friend(friend_id):
+    print("helllloooo\n")
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT * FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+    ''', (user_id, friend_id, friend_id, user_id))
+    existing = cursor.fetchone()
+
+    if not existing:
+        cursor.execute('''
+            INSERT INTO friendships (user_id, friend_id, status)
+            VALUES (?, ?, 'pending')
+        ''', (user_id, friend_id))
+        conn.commit()
+
+    return redirect(url_for('friends'))
+
+@app.route('/accept_friend/<int:friendship_id>')
+def accept_friend(friendship_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE friendships SET status = 'accepted' WHERE id = ?
+    ''', (friendship_id,))
+    conn.commit()
+
+    return redirect(url_for('friends'))
+
+@app.route('/reject_friend/<int:friendship_id>')
+def reject_friend(friendship_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE friendships SET status = 'rejected' WHERE id = ?
+    ''', (friendship_id,))
+    conn.commit()
+
+    return redirect(url_for('friends'))
+
+@app.route('/chat/<int:friend_id>', methods=['GET', 'POST'])
+def chat(friend_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Make sure the two users are friends
+    cursor.execute('''
+        SELECT * FROM friendships
+        WHERE (
+            (user_id = ? AND friend_id = ?) OR
+            (user_id = ? AND friend_id = ?)
+        ) AND status = 'accepted'
+    ''', (user_id, friend_id, friend_id, user_id))
+    friendship = cursor.fetchone()
+
+    if not friendship:
+        return "You are not friends with this user.", 403
+
+    if request.method == 'POST':
+        message = request.form['message']
+        if message.strip() != "":
+            cursor.execute('''
+                INSERT INTO messages (sender_id, receiver_id, message)
+                VALUES (?, ?, ?)
+            ''', (user_id, friend_id, message))
+            conn.commit()
+        return redirect(url_for('chat', friend_id=friend_id))
+
+    # Get chat history
+    cursor.execute('''
+        SELECT sender_id, message, timestamp FROM messages
+        WHERE (sender_id = ? AND receiver_id = ?)
+           OR (sender_id = ? AND receiver_id = ?)
+        ORDER BY timestamp ASC
+    ''', (user_id, friend_id, friend_id, user_id))
+    chat_history = cursor.fetchall()
+
+    # Get friend's username
+    cursor.execute('SELECT username FROM users WHERE id = ?', (friend_id,))
+    friend_username = cursor.fetchone()
+
+    return render_template('chat.html', 
+                       chat_history=chat_history, 
+                       friend_username=friend_username[0],
+                       friend_id=friend_id)
+@app.route('/chats')
+def chats():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_id = session['user_id']
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT u.id, u.username FROM users u
+        JOIN friendships f ON (f.friend_id = u.id OR f.user_id = u.id)
+        WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
+    ''', (user_id, user_id, user_id))
+    friends = cursor.fetchall()
+    return render_template('chats.html', friends=friends)
+
+@app.route('/profile/<int:user_id>')
+def profile(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT username, avatar, about_me FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        return "User not found.", 404
+
+    return render_template('profile.html',
+                           username=user[0],
+                           avatar=user[1],
+                           about_me=user[2],
+                           user_id=user_id)
+
+
+@app.route('/save_profile_field', methods=['POST'])
+def save_profile_field():
+    if 'user_id' not in session:
+        return jsonify({'success': False}), 403
+
+    data = request.get_json()
+    field = data.get('field')
+    value = data.get('value')
+
+    if field not in ['username', 'about_me']:
+        return jsonify({'success': False}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(f'''
+        UPDATE users SET {field} = ?
+        WHERE id = ?
+    ''', (value, session['user_id']))
+    conn.commit()
+    conn.close()
+
+    if field == 'username':
+        session['username'] = value
+
+    return jsonify({'success': True})
+
+@app.route('/upload_avatar', methods=['POST'])
+def upload_avatar():
+    if 'user_id' not in session:
+        return jsonify({'success': False}), 403
+
+    avatar_file = request.files.get('avatar')
+    if not avatar_file or avatar_file.filename == '':
+        return jsonify({'success': False}), 400
+
+    avatar_filename = f"static/avatars/user_{session['user_id']}_{avatar_file.filename}"
+    avatar_file.save(avatar_filename)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET avatar = ? WHERE id = ?', (avatar_filename, session['user_id']))
+    conn.commit()
+    conn.close()
+
+    session['avatar'] = avatar_filename
+
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
     initialize_database()
-    app.run(debug=True)
+    socketio.run(app, debug=True, port=5001)

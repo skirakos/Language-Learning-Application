@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Friends{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+
+    <h1>Friends</h1>
+
+    {% if friends %}
+    <ul class="list-group mb-4">
+        {% for friend in friends %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ friend[1] }}
+            <a href="{{ url_for('chat', friend_id=friend[0]) }}" class="btn btn-primary btn-sm">Chat</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No friends yet.</p>
+    {% endif %}
+
+    <h2 class="mt-5">Pending Friend Requests</h2>
+
+    {% if requests %}
+    <ul class="list-group mb-4">
+        {% for request in requests %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ request[1] }}
+            <div>
+                <a href="{{ url_for('accept_friend', friendship_id=request[0]) }}" class="btn btn-success btn-sm">Accept</a>
+                <a href="{{ url_for('reject_friend', friendship_id=request[0]) }}" class="btn btn-danger btn-sm">Reject</a>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No pending requests.</p>
+    {% endif %}
+
+    <h2 class="mt-5">Find New Friends</h2>
+
+    <form method="get" action="{{ url_for('friends') }}" class="mb-4">
+        <input type="text" name="search" class="form-control" placeholder="Search users..." value="{{ search_query }}">
+        <button type="submit" class="btn btn-primary mt-2">Search</button>
+    </form>
+
+    {% if all_users %}
+    <ul class="list-group">
+        {% for user in all_users %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ user[1] }}
+            <a href="{{ url_for('add_friend', friend_id=user[0]) }}" class="btn btn-success btn-sm">Add Friend</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No users found.</p>
+    {% endif %}
+
+</div>
+{% endblock %}

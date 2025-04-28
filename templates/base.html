@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Language App{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .sidebar {
+            height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+            border-right: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .sidebar img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+        .sidebar .username {
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .sidebar a {
+            width: 100%;
+            text-align: left;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+        }
+        .sidebar a:hover {
+            background-color: #e2e6ea;
+            color: #000;
+        }
+        .sidebar a.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .sidebar i {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+            .main-content {
+                margin-left: 200px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <img src="/{{ session.get('avatar', 'static/avatars/default.png') }}" alt="Avatar">
+    <div class="username">{{ session.get('username', 'User') }}</div>
+    <hr style="width: 80%;">
+    <a href="{{ url_for('index') }}" class="{% if request.path == '/' %}active{% endif %}">
+        <i class="bi bi-house"></i> Translate & Upload
+    </a>
+    <a href="{{ url_for('friends') }}" class="{% if '/friends' in request.path %}active{% endif %}">
+        <i class="bi bi-people"></i> Friends
+    </a>
+    <a href="{{ url_for('chats') }}" class="{% if '/chats' in request.path or '/chat' in request.path %}active{% endif %}">
+        <i class="bi bi-chat-dots"></i> Chats
+    </a>
+    <a href="{{ url_for('profile', user_id=session['user_id']) }}" class="{% if '/profile' in request.path %}active{% endif %}">
+        <i class="bi bi-person"></i> My Profile
+    </a>
+    <a href="{{ url_for('view_vocabulary') }}" class="{% if '/vocabulary' in request.path %}active{% endif %}">
+        <i class="bi bi-journal-bookmark"></i> Vocabulary
+    </a>
+    <a href="{{ url_for('logout') }}">
+        <i class="bi bi-box-arrow-right"></i> Logout
+    </a>
+</div>
+
+<div class="main-content">
+    {% block content %}{% endblock %}
+</div>
+
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

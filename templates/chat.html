@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Chat{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Chat with {{ friend_username }}</h2>
+
+    <!-- Chat box -->
+    <div id="chatBox" style="height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
+        {% for sender_id, message, timestamp in chat_history %}
+            <p>
+                <strong>{{ 'You' if sender_id == session['user_id'] else friend_username }}:</strong> {{ message }}
+            </p>
+        {% endfor %}
+    </div>
+
+    <!-- Send message form -->
+    <form id="sendForm">
+        <div class="input-group">
+            <input type="text" id="messageInput" class="form-control" placeholder="Type your message..." required>
+            <button type="submit" class="btn btn-primary">Send</button>
+        </div>
+    </form>
+</div>
+
+<!-- SocketIO client -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+
+<script>
+const socket = io();
+
+// Join user's private room
+socket.emit('join', { room: "user_{{ session['user_id'] }}" });
+
+// Handle sending message
+document.getElementById('sendForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    if (message.length > 0) {
+        socket.emit('send_message', {
+            receiver_id: {{ friend_id }},
+            message: message
+        });
+        messageInput.value = '';
+    }
+});
+
+// Handle receiving message
+socket.on('receive_message', function(data) {
+    if (data.sender_id === {{ friend_id }} || data.receiver_id === {{ friend_id }}) {
+        const chatBox = document.getElementById('chatBox');
+        const messageElement = document.createElement('p');
+        messageElement.innerHTML = data.sender_id === {{ session['user_id'] }}
+            ? `<strong>You:</strong> ${data.message}`
+            : `<strong>{{ friend_username }}:</strong> ${data.message}`;
+        chatBox.appendChild(messageElement);
+
+        // Scroll to bottom automatically
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+});
+
+// Scroll to bottom initially
+const chatBox = document.getElementById('chatBox');
+chatBox.scrollTop = chatBox.scrollHeight;
+</script>
+{% endblock %}
