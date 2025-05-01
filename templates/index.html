@@ -28,7 +28,8 @@
                 </div>
 
                 <div class="mb-3">
-                    <input type="text" id="selected-word" class="form-control" placeholder="Selected word...">
+                    <label for="selected-word" class="form-label">Word to Translate (manual or from image):</label>
+                    <input type="text" id="selected-word" class="form-control" placeholder="Type a word or select from image...">
                 </div>
 
                 <button type="button" id="translate-button" class="btn btn-primary">Translate</button>
@@ -68,7 +69,9 @@ const audioPlayer = document.getElementById('audio-player');
 
 textArea.addEventListener('mouseup', () => {
     const selection = window.getSelection().toString().trim();
-    selectedWordInput.value = selection;
+    if (selection.length > 0 && selectedWordInput.value.trim() === '') {
+        selectedWordInput.value = selection;
+    }
 });
 
 uploadForm.addEventListener('submit', async (e) => {
@@ -84,18 +87,22 @@ uploadForm.addEventListener('submit', async (e) => {
 });
 
 translateButton.addEventListener('click', async () => {
-    const word = selectedWordInput.value;
+    const word = selectedWordInput.value.trim();
+    const sourceLang = document.getElementById('source-lang').value;
+    const targetLang = document.getElementById('target-lang').value;
+
     const response = await fetch('/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word })
+        body: JSON.stringify({ word, sourceLang, targetLang })
     });
+
     const data = await response.json();
     translationOutput.textContent = `Translation: ${data.translation}`;
 });
 
 pronounceButton.addEventListener('click', async () => {
-    const word = selectedWordInput.value;
+    const word = selectedWordInput.value.trim();
     const response = await fetch('/pronounce', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,8 +113,9 @@ pronounceButton.addEventListener('click', async () => {
 });
 
 saveButton.addEventListener('click', async () => {
-    const word = selectedWordInput.value;
+    const word = selectedWordInput.value.trim();
     const translation = translationOutput.textContent.replace('Translation: ', '');
+    if (!word || !translation) return alert('Please translate a word first.');
     await fetch('/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
