@@ -1,12 +1,27 @@
 {% extends 'base.html' %}
-{% block title %}Vocabulary{% endblock %}
+{% block title %}Your Vocabulary{% endblock %}
+
 {% block content %}
-<h1>Your Vocabulary</h1>
-<ul>
-    {% for word, translation in vocab %}
-        <li><strong>{{ word }}</strong> - {{ translation }}</li>
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">📚 Your Saved Vocabulary</h2>
+
+    {% if vocab %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for word, translation in vocab %}
+        <div class="col">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">{{ word }}</h5>
+                    <p class="card-text">Translation: <strong>{{ translation }}</strong></p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <li>No vocabulary saved yet!</li>
-    {% endfor %}
-</ul>
+    <div class="alert alert-info text-center mt-4">
+        You haven't saved any vocabulary yet. Start translating!
+    </div>
+    {% endif %}
+</div>
 {% endblock %}
