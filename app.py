@@ -300,7 +300,6 @@ def add_friend(friend_id):
     user_id = session['user_id']
     conn = get_db()
     cursor = conn.cursor()
-
     cursor.execute('''
         SELECT * FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
     ''', (user_id, friend_id, friend_id, user_id))
@@ -312,7 +311,7 @@ def add_friend(friend_id):
             VALUES (?, ?, 'pending')
         ''', (user_id, friend_id))
         conn.commit()
-
+        
     return redirect(url_for('friends'))
 
 @app.route('/accept_friend/<int:friendship_id>')
@@ -343,7 +342,7 @@ def reject_friend(friendship_id):
 
     return redirect(url_for('friends'))
 
-@app.route('/chat/<int:friend_id>', methods=['GET', 'POST'])
+@app.route('/chat/<int:friend_id>')
 def chat(friend_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -365,16 +364,6 @@ def chat(friend_id):
     if not friendship:
         return "You are not friends with this user.", 403
 
-    if request.method == 'POST':
-        message = request.form['message']
-        if message.strip() != "":
-            cursor.execute('''
-                INSERT INTO messages (sender_id, receiver_id, message)
-                VALUES (?, ?, ?)
-            ''', (user_id, friend_id, message))
-            conn.commit()
-        return redirect(url_for('chat', friend_id=friend_id))
-
     # Get chat history
     cursor.execute('''
         SELECT sender_id, message, timestamp FROM messages
@@ -388,10 +377,18 @@ def chat(friend_id):
     cursor.execute('SELECT username FROM users WHERE id = ?', (friend_id,))
     friend_username = cursor.fetchone()
 
-    return render_template('chat.html', 
-                       chat_history=chat_history, 
-                       friend_username=friend_username[0],
-                       friend_id=friend_id)
+    # ✅ Get vocabulary list to send as cards
+    cursor.execute('SELECT word, translation FROM vocabulary WHERE user_id = ?', (user_id,))
+    vocab_cards = cursor.fetchall()
+
+    conn.close()
+
+    return render_template('chat.html',
+                           chat_history=chat_history,
+                           friend_username=friend_username[0],
+                           friend_id=friend_id,
+                           vocab_cards=vocab_cards)
+
 @app.route('/chats')
 def chats():
     if 'user_id' not in session:
