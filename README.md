@@ -1,5 +1,3 @@
-# Language-Learning-Application
-
 # Language Learning Application
 
 A web-based language learning tool that allows users to upload images and extract vocabulary from them using OCR. The extracted words are saved to a personal vocabulary list, which users can review and quiz themselves on.
